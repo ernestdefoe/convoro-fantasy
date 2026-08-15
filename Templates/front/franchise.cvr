@@ -1,0 +1,155 @@
+@layout('theme::layouts/main')
+
+@section('title'){{ $franchise['display_name'] }}@endsection
+
+@section('breadcrumb')
+<a href="/fantasy">@lang('fantasy.title')</a>
+<a href="/fantasy/{{ $league['slug'] }}">{{ $league['name'] }}</a>
+<span>{{ $franchise['display_name'] }}</span>
+@endsection
+
+@section('content')
+@include('fantasy::front/styles')
+
+<div class="page-header">
+    <div>
+        <h2>{{ $franchise['display_name'] }}</h2>
+        <p class="page-header-note">{{ $franchise['username'] }}</p>
+    </div>
+
+    @if($isMine && $league['status'] === 'active')
+    <div class="page-header-actions">
+        <a class="btn btn-primary btn-sm" href="/fantasy/{{ $league['slug'] }}/lineup">@lang('fantasy.set_lineup')</a>
+    </div>
+    @endif
+</div>
+
+{# ---------------------------------------------------------------- squad -- #}
+
+<div class="fan-section">
+    <h3>@lang('fantasy.roster')</h3>
+
+    @empty($roster)
+    <p class="fan-empty">@lang('fantasy.squad_empty')</p>
+    @endempty
+
+    @notempty($roster)
+    <div class="fan-lineup">
+        @each ($roster as $team)
+        <div class="fan-row @if(in_array((int) $team['team_id'], $starting, true))fan-row-starting @endif">
+            <div class="fan-row-main">
+                <span class="fan-mark">
+                    @notempty($team['logo_path'])<img src="{{ $team['logo_path'] }}" alt="" loading="lazy">@endnotempty
+                </span>
+                <span class="fan-team-name">
+                    {#
+                        The team's own forum, when it has one. This is the whole
+                        point of running fantasy on a forum organised by team:
+                        the squad page is a set of doors into the place people
+                        already talk.
+                    #}
+                    @notempty($team['forum_slug'])
+                    <a href="/forum/{{ $team['forum_slug'] }}"><strong>{{ $team['team_name'] }}</strong></a>
+                    @endnotempty
+                    @empty($team['forum_slug'])
+                    <strong>{{ $team['team_name'] }}</strong>
+                    @endempty
+
+                    <span class="fan-row-note">
+                        {{ $team['conference'] }}
+                        &middot;
+                        @if($team['acquired_via'] === 'draft')@lang('fantasy.acquired_draft')@endif
+                        @if($team['acquired_via'] === 'waiver')@lang('fantasy.acquired_waiver')@endif
+                        @if($team['acquired_via'] === 'trade')@lang('fantasy.acquired_trade')@endif
+                    </span>
+                </span>
+            </div>
+
+            @if(in_array((int) $team['team_id'], $starting, true))
+            <span class="fan-pill fan-pill-live">@lang('fantasy.starting')</span>
+            @endif
+        </div>
+        @endeach
+    </div>
+    @endnotempty
+</div>
+
+{# ------------------------------------------------------------ breakdown -- #}
+
+@notempty($week)
+<div class="fan-section">
+    <h3>@lang('fantasy.week_breakdown') &mdash; {{ $week['name'] }}</h3>
+
+    @empty($breakdown)
+    <p class="fan-empty">@lang('fantasy.no_breakdown')</p>
+    @endempty
+
+    @notempty($breakdown)
+    <div class="card">
+        <div class="card-body" style="overflow-x:auto;">
+            <table class="fan-table">
+                <thead>
+                    <tr>
+                        <th>@lang('fantasy.college_team')</th>
+                        <th class="fan-num">@lang('fantasy.scored_column')</th>
+                        <th class="fan-num">@lang('fantasy.allowed_column')</th>
+                        <th class="fan-num">@lang('fantasy.bonus_column')</th>
+                        <th class="fan-num">@lang('fantasy.points_column')</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @php $total = 0.0; @endphp
+                    @each ($breakdown as $row)
+                    @php $total += (float) $row['points']; @endphp
+                    <tr>
+                        <td>
+                            <span class="fan-team">
+                                <span class="fan-mark">
+                                    @notempty($row['team_logo'])<img src="{{ $row['team_logo'] }}" alt="" loading="lazy">@endnotempty
+                                </span>
+                                <span class="fan-team-name">{{ $row['team_name'] }}</span>
+                            </span>
+                        </td>
+                        <td class="fan-num">{{ $row['scored'] }}</td>
+                        <td class="fan-num">{{ $row['allowed'] }}</td>
+                        <td class="fan-num">{{ number_format((float) $row['bonus'], 2) }}</td>
+                        <td class="fan-num"><strong>{{ number_format((float) $row['points'], 2) }}</strong></td>
+                    </tr>
+                    @endeach
+                    <tr>
+                        <td><strong>@lang('fantasy.total')</strong></td>
+                        <td class="fan-num"></td>
+                        <td class="fan-num"></td>
+                        <td class="fan-num"></td>
+                        <td class="fan-num"><strong>{{ number_format($total, 2) }}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endnotempty
+</div>
+@endnotempty
+
+{# ------------------------------------------------------------- scoring --- #}
+
+<div class="fan-section">
+    <h3>@lang('fantasy.scoring_rules')</h3>
+    <div class="card">
+        <div class="card-body">
+            <table class="fan-table">
+                <tbody>
+                    <tr><td>@lang('fantasy.points_per_point')</td><td class="fan-num">{{ number_format($league['points_per_point'], 2) }}</td></tr>
+                    <tr><td>@lang('fantasy.points_per_point_allowed')</td><td class="fan-num">{{ number_format($league['points_per_point_allowed'], 2) }}</td></tr>
+                    <tr><td>@lang('fantasy.win_bonus')</td><td class="fan-num">{{ number_format($league['win_bonus'], 2) }}</td></tr>
+                    <tr><td>@lang('fantasy.shutout_bonus')</td><td class="fan-num">{{ number_format($league['shutout_bonus'], 2) }}</td></tr>
+                    <tr><td>@lang('fantasy.points_per_margin')</td><td class="fan-num">{{ number_format($league['points_per_margin'], 2) }}</td></tr>
+                    @if($league['upset_bonus'] != 0)
+                    <tr><td>@lang('fantasy.upset_bonus')</td><td class="fan-num">{{ number_format($league['upset_bonus'], 2) }}</td></tr>
+                    @endif
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@endsection

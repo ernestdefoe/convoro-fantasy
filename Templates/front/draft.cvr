@@ -1,0 +1,163 @@
+@layout('theme::layouts/main')
+
+@section('title')@lang('fantasy.draft_room')@endsection
+
+@section('breadcrumb')
+<a href="/fantasy">@lang('fantasy.title')</a>
+<a href="/fantasy/{{ $league['slug'] }}">{{ $league['name'] }}</a>
+<span>@lang('fantasy.draft_room')</span>
+@endsection
+
+@section('content')
+@include('fantasy::front/styles')
+
+<div class="page-header">
+    <div>
+        <h2>@lang('fantasy.draft_room')</h2>
+        <p class="page-header-note">{{ $league['name'] }}</p>
+    </div>
+</div>
+
+@notempty($notice)<div class="alert alert-success">{{ $notice }}</div>@endnotempty
+@notempty($problem)<div class="alert alert-error">{{ $problem }}</div>@endnotempty
+
+{# ------------------------------------------------------- before it starts - #}
+
+@if($league['status'] === 'setup')
+<div class="card">
+    <div class="card-body">
+        <p>@lang('fantasy.draft_not_started')</p>
+        <p class="fan-empty">@lang('fantasy.draft_not_started_hint')</p>
+
+        @if($isCommissioner)
+        <form method="post" action="/fantasy/{{ $league['slug'] }}/draft/start">
+            @csrf
+            <button type="submit" class="btn btn-primary">@lang('fantasy.start_draft')</button>
+        </form>
+        @endif
+    </div>
+</div>
+@endif
+
+{# -------------------------------------------------------- on the clock --- #}
+
+@notempty($slot)
+<div class="fan-clock @if($isMyTurn)fan-clock-mine @endif">
+    <div>
+        <strong>
+            @if($isMyTurn)@lang('fantasy.your_turn')@endif
+            @if(!$isMyTurn)@lang('fantasy.on_the_clock', ['name' => $onTheClockName])@endif
+        </strong>
+        <div class="fan-meta">
+            @lang('fantasy.round_number', ['number' => $slot['round']])
+            &middot; @lang('fantasy.pick_number', ['number' => $slot['overall']])
+            @if($deadline > 0)
+            &middot; @lang('fantasy.pick_deadline', ['when' => \Convoro\Extensions\Picks\Picks::until($deadline)])
+            @endif
+        </div>
+    </div>
+
+    {# 🚨 The commissioner can always move a stalled draft on, whether or not
+       the league set a clock. A league with no clock has no other way out. #}
+    @if($isCommissioner && !$isMyTurn)
+    <form method="post" action="/fantasy/{{ $league['slug'] }}/draft/skip">
+        @csrf
+        <button type="submit" class="btn btn-secondary btn-sm">@lang('fantasy.skip_pick')</button>
+    </form>
+    @endif
+</div>
+@endnotempty
+
+@if($league['status'] === 'active' && $league['draft_finished_at'] > 0)
+<div class="alert alert-success">@lang('fantasy.draft_finished')</div>
+@endif
+
+{# ------------------------------------------------------------ available -- #}
+
+@if($league['status'] === 'drafting')
+<div class="fan-section">
+    <h3>@lang('fantasy.available_teams')</h3>
+
+    <form method="get" action="/fantasy/{{ $league['slug'] }}/draft" style="margin-bottom:.75rem;">
+        <input type="search" name="q" class="form-input input-sm" value="{{ $search }}"
+               placeholder="@lang('fantasy.search_teams')" aria-label="@lang('fantasy.search_teams')">
+    </form>
+
+    @empty($available)
+    <p class="fan-empty">@lang('fantasy.nothing_available')</p>
+    @endempty
+
+    @notempty($available)
+    <div class="fan-lineup">
+        @each ($available as $team)
+        <div class="fan-row">
+            <div class="fan-row-main">
+                <span class="fan-mark">
+                    @notempty($team['logo_path'])<img src="{{ $team['logo_path'] }}" alt="" loading="lazy">@endnotempty
+                </span>
+                <span class="fan-team-name">
+                    {{ $team['name'] }}
+                    @notempty($team['conference'])<span class="fan-row-note">{{ $team['conference'] }}</span>@endnotempty
+                </span>
+            </div>
+
+            {#
+                🚨 The button is only rendered on your own turn, and the
+                controller checks again anyway. The page was rendered before
+                somebody else picked; the render is a hint, the check is the
+                rule.
+            #}
+            @if($isMyTurn)
+            <form method="post" action="/fantasy/{{ $league['slug'] }}/draft/pick">
+                @csrf
+                <input type="hidden" name="team_id" value="{{ $team['id'] }}">
+                <button type="submit" class="btn btn-primary btn-sm">@lang('fantasy.draft_this_team')</button>
+            </form>
+            @endif
+        </div>
+        @endeach
+    </div>
+    @endnotempty
+</div>
+@endif
+
+{# ---------------------------------------------------------------- board -- #}
+
+@notempty($teamsByRound)
+<div class="fan-section">
+    <h3>@lang('fantasy.draft_room')</h3>
+    <div class="card">
+        <div class="card-body fan-board">
+            <table class="fan-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>@lang('fantasy.franchise')</th>
+                        <th>@lang('fantasy.college_team')</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @each ($teamsByRound as $round => $slots)
+                    @each ($slots as $entry)
+                    <tr>
+                        <td class="fan-meta">{{ $entry['round'] }}.{{ $entry['overall'] }}</td>
+                        <td>{{ $franchises[$entry['franchise_id']]['display_name'] ?? '' }}</td>
+                        <td>
+                            @empty($entry['team_id'])
+                            <span class="fan-slot-empty">&mdash;</span>
+                            @endempty
+                            @notempty($entry['team_id'])
+                            {{ $teamNames[$entry['team_id']] ?? '' }}
+                            @if($entry['autopicked'])<span class="fan-pill">@lang('fantasy.autopicked')</span>@endif
+                            @endnotempty
+                        </td>
+                    </tr>
+                    @endeach
+                    @endeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@endnotempty
+@endsection

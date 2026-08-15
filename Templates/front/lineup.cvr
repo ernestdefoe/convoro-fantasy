@@ -1,0 +1,142 @@
+@layout('theme::layouts/main')
+
+@section('title')@lang('fantasy.lineup_title')@endsection
+
+@section('breadcrumb')
+<a href="/fantasy">@lang('fantasy.title')</a>
+<a href="/fantasy/{{ $league['slug'] }}">{{ $league['name'] }}</a>
+<span>@lang('fantasy.lineup_title')</span>
+@endsection
+
+@section('content')
+@include('fantasy::front/styles')
+
+<div class="page-header">
+    <div>
+        <h2>@lang('fantasy.lineup_for_week', ['week' => $week['name']])</h2>
+        <p class="page-header-note">
+            @lang('fantasy.starting_count', ['count' => $startingCount, 'total' => $league['starters']])
+        </p>
+    </div>
+</div>
+
+@notempty($notice)<div class="alert alert-success">{{ $notice }}</div>@endnotempty
+@notempty($problem)<div class="alert alert-error">{{ $problem }}</div>@endnotempty
+
+@empty($teams)
+<div class="card"><div class="card-body"><p class="fan-empty">@lang('fantasy.squad_empty')</p></div></div>
+@endempty
+
+@notempty($teams)
+<div class="fan-lineup">
+    @each ($teams as $team)
+    <div class="fan-row @if($team['is_starting'])fan-row-starting @endif">
+        <div class="fan-row-main">
+            <span class="fan-mark">
+                @notempty($team['logo_path'])<img src="{{ $team['logo_path'] }}" alt="" loading="lazy">@endnotempty
+            </span>
+
+            <span class="fan-team-name">
+                <strong>{{ $team['team_name'] }}</strong>
+
+                <span class="fan-row-note">
+                    @empty($team['game'])
+                    @lang('fantasy.no_game_this_week')
+                    @endempty
+
+                    @notempty($team['game'])
+                    @if($team['game']['is_home'])@lang('fantasy.plays', ['opponent' => $team['opponent']])@endif
+                    @if(!$team['game']['is_home'])@lang('fantasy.at', ['opponent' => $team['opponent']])@endif
+
+                    {#
+                        🚨 Says WHY a row cannot be moved, in the same units the
+                        member is thinking in. "Locks in 40 minutes" needs no
+                        timezone; a timestamp does.
+                    #}
+                    &middot;
+                    @if($team['is_movable'])@lang('fantasy.locks', ['when' => \Convoro\Extensions\Picks\Picks::until((int) $team['locks_at'])])@endif
+                    @if(!$team['is_movable'])@lang('fantasy.locked_now')@endif
+                    @endnotempty
+                </span>
+            </span>
+        </div>
+
+        <span class="fan-pill @if($team['is_starting'])fan-pill-live @endif">
+            @if($team['is_starting'])@lang('fantasy.starting')@endif
+            @if(!$team['is_starting'])@lang('fantasy.bench')@endif
+        </span>
+
+        @if($team['is_movable'])
+        <form method="post" action="/fantasy/{{ $league['slug'] }}/lineup/@if($team['is_starting'])bench @endif@if(!$team['is_starting'])start @endif">
+            @csrf
+            <input type="hidden" name="team_id" value="{{ $team['team_id'] }}">
+            <button type="submit" class="btn btn-secondary btn-sm">
+                @if($team['is_starting'])@lang('fantasy.bench_team')@endif
+                @if(!$team['is_starting'])@lang('fantasy.start_team')@endif
+            </button>
+        </form>
+        @endif
+    </div>
+    @endeach
+</div>
+@endnotempty
+
+{# ---------------------------------------------------------- free agents -- #}
+
+<div class="fan-section">
+    <h3>@lang('fantasy.free_agents')</h3>
+
+    @if($rosterFull)
+    <p class="fan-empty">@lang('fantasy.roster_full_hint')</p>
+    @endif
+
+    <form method="get" action="/fantasy/{{ $league['slug'] }}/lineup" style="margin-bottom:.75rem;">
+        <input type="search" name="q" class="form-input input-sm" value="{{ $search }}"
+               placeholder="@lang('fantasy.search_teams')" aria-label="@lang('fantasy.search_teams')">
+    </form>
+
+    @empty($freeAgents)
+    <p class="fan-empty">@lang('fantasy.no_free_agents')</p>
+    @endempty
+
+    @notempty($freeAgents)
+    <div class="fan-lineup">
+        @each ($freeAgents as $agent)
+        <div class="fan-row">
+            <div class="fan-row-main">
+                <span class="fan-mark">
+                    @notempty($agent['logo_path'])<img src="{{ $agent['logo_path'] }}" alt="" loading="lazy">@endnotempty
+                </span>
+                <span class="fan-team-name">
+                    {{ $agent['name'] }}
+                    @notempty($agent['conference'])<span class="fan-row-note">{{ $agent['conference'] }}</span>@endnotempty
+                </span>
+            </div>
+
+            <form method="post" action="/fantasy/{{ $league['slug'] }}/lineup/swap">
+                @csrf
+                <input type="hidden" name="add_team_id" value="{{ $agent['id'] }}">
+
+                {#
+                    🚨 Signing and releasing are ONE submit. Doing them as two
+                    requests leaves a window where somebody else takes the team
+                    — and the member has already given theirs up.
+                #}
+                @if($rosterFull)
+                <select name="drop_team_id" class="form-input input-sm" required
+                        aria-label="@lang('fantasy.release_first')">
+                    <option value="">@lang('fantasy.release_first')</option>
+                    @each ($teams as $held)
+                    <option value="{{ $held['team_id'] }}">{{ $held['team_name'] }}</option>
+                    @endeach
+                </select>
+                @endif
+
+                <button type="submit" class="btn btn-secondary btn-sm">@lang('fantasy.sign')</button>
+            </form>
+        </div>
+        @endeach
+    </div>
+    @endnotempty
+</div>
+@endsection

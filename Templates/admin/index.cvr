@@ -1,0 +1,156 @@
+@layout('theme::layouts/admin')
+
+@section('title')@lang('fantasy.admin_title')@endsection
+
+@section('content')
+<div class="admin-header">
+    <div>
+        <h1>@lang('fantasy.admin_title')</h1>
+        <p class="admin-hint">@lang('fantasy.admin_intro')</p>
+    </div>
+</div>
+
+@notempty($notice)<div class="alert alert-success">{{ $notice }}</div>@endnotempty
+@notempty($problem)<div class="alert alert-error">{{ $problem }}</div>@endnotempty
+
+{#
+    🚨 Says what is wrong and what it means, not only that something is off.
+    Fantasy with Picks disabled looks identical to Fantasy in the off-season,
+    which is exactly the failure an operator cannot diagnose from the outside.
+#}
+@if(!$picksReady)
+<div class="alert alert-warning">@lang('fantasy.admin_needs_picks')</div>
+@endif
+
+<div class="admin-card">
+    <div class="admin-card-body">
+        <form method="post" action="/admin/fantasy/settings">
+            @csrf
+
+            <div class="form-group">
+                <label class="form-check">
+                    <input type="checkbox" name="fantasy_enabled" value="1"
+                           @if($settings->enabled())checked @endif>
+                    <span>@lang('fantasy.admin_enabled')</span>
+                </label>
+                <span class="form-hint">@lang('fantasy.admin_enabled_hint')</span>
+            </div>
+
+            <div class="form-group">
+                <label for="fan-max-owned">@lang('fantasy.admin_max_owned')</label>
+                <input type="number" id="fan-max-owned" name="fantasy_max_owned" class="form-input input-sm"
+                       value="{{ $settings->maxOwned() }}" min="1" max="50">
+            </div>
+
+            <h3>@lang('fantasy.admin_defaults')</h3>
+
+            <div class="form-group">
+                <label for="fan-def-franchises">@lang('fantasy.league_size')</label>
+                <input type="number" id="fan-def-franchises" name="fantasy_default_franchises"
+                       class="form-input input-sm" value="{{ $settings->defaultFranchises() }}" min="2" max="32">
+            </div>
+
+            <div class="form-group">
+                <label for="fan-def-roster">@lang('fantasy.roster_size')</label>
+                <input type="number" id="fan-def-roster" name="fantasy_default_roster"
+                       class="form-input input-sm" value="{{ $settings->defaultRoster() }}" min="1" max="25">
+            </div>
+
+            <div class="form-group">
+                <label for="fan-def-starters">@lang('fantasy.starters')</label>
+                <input type="number" id="fan-def-starters" name="fantasy_default_starters"
+                       class="form-input input-sm" value="{{ $settings->defaultStarters() }}" min="1" max="25">
+            </div>
+
+            <div class="form-group">
+                <label class="form-check">
+                    <input type="checkbox" name="fantasy_autopick" value="1"
+                           @if($settings->autopicks())checked @endif>
+                    <span>@lang('fantasy.admin_autopick')</span>
+                </label>
+                <span class="form-hint">@lang('fantasy.admin_autopick_hint')</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-check">
+                    <input type="checkbox" name="fantasy_carry_lineups" value="1"
+                           @if($settings->carriesLineups())checked @endif>
+                    <span>@lang('fantasy.admin_carry')</span>
+                </label>
+                <span class="form-hint">@lang('fantasy.admin_carry_hint')</span>
+            </div>
+
+            <button type="submit" class="btn btn-primary">@lang('fantasy.save')</button>
+        </form>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div class="admin-card-body">
+        <h3>@lang('fantasy.admin_leagues')</h3>
+
+        @empty($leagues)
+        <p class="admin-hint">@lang('fantasy.admin_no_leagues')</p>
+        @endempty
+
+        @notempty($leagues)
+        @each ($leagues as $league)
+        <details class="admin-card">
+            <summary class="admin-card-header">
+                <span>
+                    <strong>{{ $league['name'] }}</strong>
+                    <span class="admin-hint">
+                        @choice('fantasy.members_count', (int) ($league['franchise_count'] ?? 0))
+                        &middot;
+                        @if($league['status'] === 'setup')@lang('fantasy.status_setup')@endif
+                        @if($league['status'] === 'drafting')@lang('fantasy.status_drafting')@endif
+                        @if($league['status'] === 'active')@lang('fantasy.status_active')@endif
+                        @if($league['status'] === 'complete')@lang('fantasy.status_complete')@endif
+                    </span>
+                </span>
+            </summary>
+
+            <div class="admin-card-body">
+                <p><a href="/fantasy/{{ $league['slug'] }}">/fantasy/{{ $league['slug'] }}</a></p>
+
+                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/rescore">
+                    @csrf
+                    <button type="submit" class="btn btn-secondary btn-sm">@lang('fantasy.admin_rescore')</button>
+                    <span class="form-hint">@lang('fantasy.admin_rescore_hint')</span>
+                </form>
+
+                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/reschedule" style="margin-top:.75rem;">
+                    @csrf
+                    <button type="submit" class="btn btn-secondary btn-sm">@lang('fantasy.admin_reschedule')</button>
+                </form>
+
+                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/adopt" style="margin-top:.75rem;">
+                    @csrf
+                    <label for="fan-adopt-{{ $league['id'] }}">@lang('fantasy.admin_adopt')</label>
+                    <input type="text" id="fan-adopt-{{ $league['id'] }}" name="commissioner"
+                           class="form-input input-sm" autocomplete="off">
+                    <button type="submit" class="btn btn-secondary btn-sm">@lang('fantasy.admin_adopt')</button>
+                    <span class="form-hint">@lang('fantasy.admin_adopt_hint')</span>
+                </form>
+
+                {#
+                    🚨 Typing the name back is the confirmation. Every child
+                    table cascades from this row and there is no undo; a button
+                    one click from a list of leagues is a button that gets
+                    pressed on the wrong row.
+                #}
+                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/delete" style="margin-top:.75rem;">
+                    @csrf
+                    <label for="fan-del-{{ $league['id'] }}">@lang('fantasy.admin_delete')</label>
+                    <input type="text" id="fan-del-{{ $league['id'] }}" name="confirm_name"
+                           class="form-input input-sm" autocomplete="off" placeholder="{{ $league['name'] }}">
+                    <button type="submit" class="btn btn-danger btn-sm">@lang('fantasy.admin_delete')</button>
+                    <span class="form-hint">@lang('fantasy.admin_delete_hint')</span>
+                </form>
+            </div>
+        </details>
+        @endeach
+        @endnotempty
+    </div>
+</div>
+@endsection

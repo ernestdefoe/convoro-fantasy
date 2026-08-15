@@ -1,0 +1,134 @@
+@layout('theme::layouts/main')
+
+@section('title')@lang('fantasy.lobby_title')@endsection
+
+@section('breadcrumb')
+<span>@lang('fantasy.title')</span>
+@endsection
+
+@section('content')
+@include('fantasy::front/styles')
+
+<div class="page-header">
+    <div>
+        <h2>@lang('fantasy.lobby_title')</h2>
+        <p class="page-header-note">@lang('fantasy.intro')</p>
+    </div>
+</div>
+
+@notempty($notice)<div class="alert alert-success">{{ $notice }}</div>@endnotempty
+@notempty($problem)<div class="alert alert-error">{{ $problem }}</div>@endnotempty
+
+@empty($season)
+{# 🚨 Says what to do rather than only what is wrong. A dead end with no next
+   step is where somebody stops using a feature. #}
+<div class="alert alert-warning">@lang('fantasy.no_season')</div>
+@endempty
+
+@empty($leagues)
+<div class="card">
+    <div class="card-body">
+        <p class="fan-empty">@lang('fantasy.lobby_empty')</p>
+        @if($mayCreate)<p class="fan-empty">@lang('fantasy.lobby_empty_hint')</p>@endif
+    </div>
+</div>
+@endempty
+
+@notempty($leagues)
+<div class="fan-grid">
+    @each ($leagues as $league)
+    <div class="card fan-league-card">
+        <div class="card-body">
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                <h3><a href="/fantasy/{{ $league['slug'] }}">{{ $league['name'] }}</a></h3>
+                <span class="fan-pill @if($league['status'] === 'drafting')fan-pill-live @endif@if($league['status'] === 'complete')fan-pill-done @endif">
+                    @if($league['status'] === 'setup')@lang('fantasy.status_setup')@endif
+                    @if($league['status'] === 'drafting')@lang('fantasy.status_drafting')@endif
+                    @if($league['status'] === 'active')@lang('fantasy.status_active')@endif
+                    @if($league['status'] === 'complete')@lang('fantasy.status_complete')@endif
+                </span>
+            </div>
+
+            @notempty($league['description'])
+            <p class="fan-desc">{{ $league['description'] }}</p>
+            @endnotempty
+
+            <p class="fan-meta">
+                @choice('fantasy.members_count', (int) ($league['franchise_count'] ?? 0))
+                @if(($league['franchise_count'] ?? 0) < $league['max_franchises'] && $league['status'] === 'setup')
+                &middot; @choice('fantasy.spaces_left', (int) $league['max_franchises'] - (int) ($league['franchise_count'] ?? 0))
+                @endif
+                @if(!$league['is_public']) &middot; @lang('fantasy.private')@endif
+            </p>
+
+            <div>
+                <a class="btn btn-secondary btn-sm" href="/fantasy/{{ $league['slug'] }}">
+                    @if(isset($mine[$league['id']]))@lang('fantasy.my_team')@endif
+                    @if(!isset($mine[$league['id']]))@lang('fantasy.standings')@endif
+                </a>
+            </div>
+        </div>
+    </div>
+    @endeach
+</div>
+@endnotempty
+
+@if($mayCreate)
+<div class="fan-section">
+    <h3>@lang('fantasy.start_a_league')</h3>
+    <div class="card">
+        <div class="card-body">
+            <form method="post" action="/fantasy/create">
+                @csrf
+
+                <div class="form-group">
+                    <label for="fan-name">@lang('fantasy.league_name')</label>
+                    <input type="text" id="fan-name" name="name" class="form-input" maxlength="190" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="fan-desc">@lang('fantasy.league_description')</label>
+                    <input type="text" id="fan-desc" name="description" class="form-input" maxlength="500">
+                </div>
+
+                <div class="form-group">
+                    <label for="fan-size">@lang('fantasy.league_size')</label>
+                    <input type="number" id="fan-size" name="max_franchises" class="form-input input-sm"
+                           value="10" min="2" max="32">
+                </div>
+
+                <div class="form-group">
+                    <label for="fan-roster">@lang('fantasy.roster_size')</label>
+                    <input type="number" id="fan-roster" name="roster_size" class="form-input input-sm"
+                           value="8" min="1" max="25">
+                </div>
+
+                <div class="form-group">
+                    <label for="fan-starters">@lang('fantasy.starters')</label>
+                    <input type="number" id="fan-starters" name="starters" class="form-input input-sm"
+                           value="4" min="1" max="25">
+                </div>
+
+                <div class="form-group">
+                    <label for="fan-draft-type">@lang('fantasy.draft_type')</label>
+                    <select id="fan-draft-type" name="draft_type" class="form-input">
+                        <option value="snake">@lang('fantasy.draft_snake')</option>
+                        <option value="linear">@lang('fantasy.draft_linear')</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="fan-visibility">@lang('fantasy.visibility')</label>
+                    <select id="fan-visibility" name="is_public" class="form-input">
+                        <option value="1">@lang('fantasy.public')</option>
+                        <option value="0">@lang('fantasy.private')</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary">@lang('fantasy.start_a_league')</button>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+@endsection

@@ -1,0 +1,233 @@
+@layout('theme::layouts/main')
+
+@section('title'){{ $league['name'] }}@endsection
+
+@section('breadcrumb')
+<a href="/fantasy">@lang('fantasy.title')</a>
+<span>{{ $league['name'] }}</span>
+@endsection
+
+@section('content')
+@include('fantasy::front/styles')
+
+<div class="page-header">
+    <div>
+        <h2>{{ $league['name'] }}</h2>
+        @notempty($league['description'])
+        <p class="page-header-note">{{ $league['description'] }}</p>
+        @endnotempty
+    </div>
+
+    <div class="page-header-actions">
+        @notempty($mine)
+        @if($league['status'] === 'active')
+        <a class="btn btn-primary btn-sm" href="/fantasy/{{ $league['slug'] }}/lineup">@lang('fantasy.set_lineup')</a>
+        @endif
+        @endnotempty
+        @if($league['status'] !== 'setup' || $isCommissioner)
+        <a class="btn btn-secondary btn-sm" href="/fantasy/{{ $league['slug'] }}/draft">@lang('fantasy.go_to_draft')</a>
+        @endif
+    </div>
+</div>
+
+@notempty($notice)<div class="alert alert-success">{{ $notice }}</div>@endnotempty
+@notempty($problem)<div class="alert alert-error">{{ $problem }}</div>@endnotempty
+
+{#
+    🚨 The line that keeps this page honest.
+
+    Everything below is what the scheduled scoring pass last wrote, not what is
+    true this second. Saying when that was, before anything claims to be a
+    result, is the difference between a page that is a few minutes behind and a
+    page that lies.
+#}
+@if($scoredAt > 0 && $league['status'] === 'active')
+<p class="fan-meta">@lang('fantasy.as_of', ['when' => \Convoro\Extensions\Picks\Picks::ago($scoredAt)])</p>
+@endif
+
+{# ------------------------------------------------------------ joining ---- #}
+
+@empty($mine)
+@if($league['status'] === 'setup' && $mayPlay && !$isFull)
+<div class="card">
+    <div class="card-body">
+        <form method="post" action="/fantasy/{{ $league['slug'] }}/join">
+            @csrf
+
+            <div class="form-group">
+                <label for="fan-team-name">@lang('fantasy.team_name')</label>
+                <input type="text" id="fan-team-name" name="team_name" class="form-input" maxlength="100">
+            </div>
+
+            {# Only asked for when it is actually needed. #}
+            @if(!$league['is_public'])
+            <div class="form-group">
+                <label for="fan-join-code">@lang('fantasy.join_code')</label>
+                <input type="text" id="fan-join-code" name="join_code" class="form-input input-sm"
+                       maxlength="32" autocomplete="off" required>
+            </div>
+            @endif
+
+            <button type="submit" class="btn btn-primary">@lang('fantasy.join')</button>
+        </form>
+    </div>
+</div>
+@endif
+@endempty
+
+{# ------------------------------------------------------------ matchups --- #}
+
+@notempty($week)
+<div class="fan-section">
+    <h3>@lang('fantasy.this_week') &mdash; {{ $week['name'] }}</h3>
+
+    @empty($matchups)
+    <p class="fan-empty">@lang('fantasy.no_matchups')</p>
+    @endempty
+
+    @notempty($matchups)
+    <div class="fan-matchups">
+        @each ($matchups as $matchup)
+        <div class="fan-matchup @if($matchup['is_bye'])fan-matchup-bye @endif">
+            <div class="fan-side">
+                <a href="/fantasy/{{ $league['slug'] }}/franchise/{{ $matchup['home']['id'] ?? 0 }}">
+                    {{ $matchup['home']['display_name'] ?? '' }}
+                </a>
+                <span class="fan-score">{{ number_format($matchup['home_points'], 2) }}</span>
+            </div>
+
+            @if($matchup['is_bye'])
+            <span class="fan-pill">@lang('fantasy.bye_week')</span>
+            @endif
+
+            @if(!$matchup['is_bye'])
+            <span class="fan-vs">&ndash;</span>
+
+            <div class="fan-side fan-side-away">
+                <a href="/fantasy/{{ $league['slug'] }}/franchise/{{ $matchup['away']['id'] ?? 0 }}">
+                    {{ $matchup['away']['display_name'] ?? '' }}
+                </a>
+                <span class="fan-score">{{ number_format($matchup['away_points'], 2) }}</span>
+            </div>
+            @endif
+        </div>
+        @endeach
+    </div>
+    @endnotempty
+</div>
+@endnotempty
+
+{# ----------------------------------------------------------- standings --- #}
+
+<div class="fan-section">
+    <h3>@lang('fantasy.standings')</h3>
+
+    @empty($standings)
+    <p class="fan-empty">@lang('fantasy.lobby_empty')</p>
+    @endempty
+
+    @notempty($standings)
+    <div class="card">
+        <div class="card-body" style="overflow-x:auto;">
+            <table class="fan-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>@lang('fantasy.franchise')</th>
+                        <th class="fan-num">@lang('fantasy.wins')</th>
+                        <th class="fan-num">@lang('fantasy.losses')</th>
+                        <th class="fan-num">@lang('fantasy.ties')</th>
+                        <th class="fan-num">@lang('fantasy.points_for')</th>
+                        <th class="fan-num">@lang('fantasy.points_against')</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @each ($standings as $row)
+                    <tr>
+                        <td>{{ $row['rank'] }}</td>
+                        <td>
+                            <a href="/fantasy/{{ $league['slug'] }}/franchise/{{ $row['id'] }}">{{ $row['display_name'] }}</a>
+                        </td>
+                        <td class="fan-num">{{ $row['wins'] }}</td>
+                        <td class="fan-num">{{ $row['losses'] }}</td>
+                        <td class="fan-num">{{ $row['ties'] }}</td>
+                        <td class="fan-num">{{ number_format($row['points_for'], 2) }}</td>
+                        <td class="fan-num">{{ number_format($row['points_against'], 2) }}</td>
+                    </tr>
+                    @endeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endnotempty
+</div>
+
+{# --------------------------------------------------------------- moves --- #}
+
+<div class="fan-section">
+    <h3>@lang('fantasy.recent_moves')</h3>
+
+    @empty($moves)
+    <p class="fan-empty">@lang('fantasy.no_moves')</p>
+    @endempty
+
+    @notempty($moves)
+    <div class="card">
+        <div class="card-body">
+            <div class="fan-moves">
+                @each ($moves as $move)
+                <div class="fan-move">
+                    <span class="fan-mark">
+                        @notempty($move['logo_path'])<img src="{{ $move['logo_path'] }}" alt="" loading="lazy">@endnotempty
+                    </span>
+                    <span>
+                        <strong>{{ $move['franchise_name'] ?: $move['username'] }}</strong>
+                        @if($move['kind'] === 'draft')@lang('fantasy.move_draft', ['team' => $move['team_name'] ?? ''])@endif
+                        @if($move['kind'] === 'add')@lang('fantasy.move_add', ['team' => $move['team_name'] ?? ''])@endif
+                        @if($move['kind'] === 'drop')@lang('fantasy.move_drop', ['team' => $move['team_name'] ?? ''])@endif
+                    </span>
+                    <span class="fan-meta">{{ \Convoro\Extensions\Picks\Picks::ago((int) $move['created_at']) }}</span>
+                </div>
+                @endeach
+            </div>
+        </div>
+    </div>
+    @endnotempty
+</div>
+
+{# ------------------------------------------------------------ my team ---- #}
+
+@notempty($mine)
+<div class="fan-section">
+    <h3>@lang('fantasy.my_team')</h3>
+    <div class="card">
+        <div class="card-body">
+            <form method="post" action="/fantasy/{{ $league['slug'] }}/rename">
+                @csrf
+                <div class="form-group">
+                    <label for="fan-rename">@lang('fantasy.team_name')</label>
+                    <input type="text" id="fan-rename" name="team_name" class="form-input"
+                           maxlength="100" value="{{ $mine['name'] }}">
+                </div>
+                <button type="submit" class="btn btn-secondary btn-sm">@lang('fantasy.rename_team')</button>
+            </form>
+
+            {# 🚨 Only offered while it is actually possible. A button that always
+               fails is worse than no button. #}
+            @if($league['status'] === 'setup')
+            <form method="post" action="/fantasy/{{ $league['slug'] }}/leave" style="margin-top:1rem;">
+                @csrf
+                <button type="submit" class="btn btn-secondary btn-sm">@lang('fantasy.leave')</button>
+            </form>
+            @endif
+        </div>
+    </div>
+</div>
+@endnotempty
+
+{# 🚨 The join code is shown to the commissioner and to nobody else — it is the
+   only thing on this page that is not public to a member who can see it. #}
+@if($isCommissioner && !$league['is_public'])
+<p class="fan-meta">@lang('fantasy.join_code'): <strong>{{ $league['join_code'] }}</strong></p>
+@endif
+@endsection
