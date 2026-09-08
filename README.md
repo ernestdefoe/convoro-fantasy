@@ -6,8 +6,17 @@ draft **teams** rather than players.
 Snake draft, weekly lineups that lock at each team's own kickoff, head-to-head
 matchups against another franchise every week, and a scoring system the
 commissioner sets. Every result is read from the fixtures and scores
-[Picks](https://github.com/ernestdefoe/convoro-picks) already syncs, so nothing
+[Picks](https://github.com/ernestdefoe/convoro-fbsfb-picks) already syncs, so nothing
 here needs a second data source or a second API key.
+
+A draft room, mid-draft — and only teams that actually play in the league's
+season are in it:
+
+![A draft room: who is on the clock, the teams still available, and every pick with the franchise that made it](screenshots/draft.png)
+
+Leagues live at `/fantasy`:
+
+![The Fantasy leagues index, showing a league and its status](screenshots/leagues.png)
 
 Third-party extension by Ernest Defoe. Requires Convoro **^1.3.10** and Picks.
 

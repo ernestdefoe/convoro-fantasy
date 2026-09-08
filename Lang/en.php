@@ -17,7 +17,14 @@ return [
     'title' => 'Fantasy',
     'admin_title' => 'Fantasy',
 
-    'intro' => 'Draft college football teams, start four of them a week, and play somebody new every week.',
+    /*
+     * 🚨 "Teams", not "college football teams". A league plays whatever
+     * competition its season is — the NFL, the NBA, the Premier League — and
+     * naming one sport on the index is wrong on every board that follows
+     * another. The number of starters is a per-league setting too, so it is not
+     * stated here either.
+     */
+    'intro' => 'Draft teams, start a few of them a week, and play somebody new every week.',
     'not_found' => 'There is nothing here.',
     'needs_picks' => 'Fantasy needs Picks switched on to know the fixtures.',
     'save' => 'Save',
