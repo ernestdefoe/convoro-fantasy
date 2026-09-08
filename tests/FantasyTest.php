@@ -33,6 +33,7 @@ use Convoro\Extensions\Fantasy\Services\Rosters;
 use Convoro\Extensions\Fantasy\Services\Schedule;
 use Convoro\Extensions\Fantasy\Services\Scoring;
 use Convoro\Extensions\Fantasy\Services\Settings;
+use Convoro\Extensions\Fantasy\Services\Sports\Scoring as SportScoring;
 
 $app = Convoro::getInstance();
 $db = $app->make('db');
@@ -905,5 +906,82 @@ return [
         $cleanUp();
 
         assertTrue(true);
+    },
+
+    /*
+     * 🚨 Scoring in a sport that is not gridiron.
+     *
+     * Points scored, points allowed, margin, a win, a shutout and an upset all
+     * mean something in every sport. The NUMBERS do not travel: a gridiron team
+     * scores about thirty points a game, a basketball team a hundred and ten,
+     * and a football team one and a half. A rate of 1.0 per point is a sensible
+     * week in one, an absurd 110-point week in another and rounding error in
+     * the third.
+     */
+    'a league starts from its own sport\'s numbers' => static function (): void {
+        $gridiron = SportScoring::defaultsFor('cfb');
+        $nfl = SportScoring::defaultsFor('nfl');
+        $hardwood = SportScoring::defaultsFor('nba');
+        $soccer = SportScoring::defaultsFor('epl');
+
+        // 🚨 The NFL and college football are ONE sport and share their numbers.
+        // Two competitions of the same game scored differently is exactly the
+        // drift a per-sport table exists to prevent.
+        assertSame($gridiron, $nfl);
+
+        assertTrue($hardwood['points_per_point'] < $gridiron['points_per_point']);
+        assertTrue($soccer['points_per_point'] > $gridiron['points_per_point']);
+
+        /*
+         * 🚨 A basketball shutout cannot happen, so the bonus is zero rather
+         * than inherited. A rule that can never pay out reads as a broken rule,
+         * not as an impossible event — and the franchise page now hides it for
+         * exactly that reason.
+         */
+        assertSame(0.0, $hardwood['shutout_bonus']);
+        assertFalse(SportScoring::shutoutsHappen('nba'));
+        assertTrue(SportScoring::shutoutsHappen('nhl'));
+
+        /*
+         * 🚨 The whole point of calibrating them: a typical week is worth
+         * roughly the same in any sport, so two leagues on one forum are
+         * comparable and a basketball table does not read like a phone number.
+         * A representative game, one starter.
+         */
+        $week = static fn (array $rules, int $scored, int $allowed): float =>
+            $scored * $rules['points_per_point']
+            + $allowed * $rules['points_per_point_allowed']
+            + $rules['win_bonus']
+            + ($scored - $allowed) * $rules['points_per_margin'];
+
+        $gridironWeek = $week($gridiron, 31, 17);
+        $hardwoodWeek = $week($hardwood, 112, 104);
+        $soccerWeek = $week($soccer, 2, 1);
+        $diamondWeek = $week(SportScoring::defaultsFor('mlb'), 5, 3);
+        $iceWeek = $week(SportScoring::defaultsFor('nhl'), 3, 2);
+
+        foreach ([
+            'gridiron' => $gridironWeek,
+            'hardwood' => $hardwoodWeek,
+            'soccer' => $soccerWeek,
+            'diamond' => $diamondWeek,
+            'ice' => $iceWeek,
+        ] as $sport => $points) {
+            assertTrue(
+                $points > 15.0 && $points < 45.0,
+                $sport . ' scores ' . round($points, 1) . ' for an ordinary win, which is not in step with the rest'
+            );
+        }
+    },
+
+    'an unknown competition is scored as gridiron rather than as nothing' => static function (): void {
+        /*
+         * A season naming a competition this build has never heard of is
+         * somebody's install, not a programming error — and every league that
+         * existed before any of this was gridiron.
+         */
+        assertSame('gridiron', SportScoring::sportOf('quidditch'));
+        assertSame('gridiron', SportScoring::sportOf(null));
+        assertSame(SportScoring::defaultsFor('cfb'), SportScoring::defaultsFor('quidditch'));
     },
 ];

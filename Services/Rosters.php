@@ -114,7 +114,15 @@ final class Rosters
             return ['ok' => false, 'problem' => 'same_team'];
         }
 
-        if (!$this->db->table('picks_teams')->where('id', $addTeamId)->exists()) {
+        /*
+         * 🚨 Only a team that PLAYS in this league's season. `picks_teams` held
+         * one sport's teams when this was written; it now carries the NFL, the
+         * NBA, MLB, the NHL and league football too, so "a team exists" stopped
+         * being the same question as "a team is in this competition". A waiver
+         * claim on a club with no fixtures leaves a franchise a starter short
+         * for the rest of the year with nothing on screen saying why.
+         */
+        if (!$this->playsIn((int) $league['season_id'], $addTeamId)) {
             return ['ok' => false, 'problem' => 'no_such_team'];
         }
 
@@ -213,10 +221,22 @@ final class Rosters
     {
         $teams = $this->db->prefixed('picks_teams');
         $rosters = $this->db->prefixed('fantasy_rosters');
+        $events = $this->db->prefixed('picks_events');
+        $weeks = $this->db->prefixed('picks_weeks');
 
-        $bindings = [$leagueId];
+        /*
+         * 🚨 Scoped to this league's season, the same as the draft board.
+         * `picks_teams` held one sport's teams when this was written; without
+         * this, a college football waiver wire lists the Milwaukee Bucks.
+         */
+        $season = $this->db->table('fantasy_leagues')->where('id', $leagueId)->first();
+
+        $bindings = [$leagueId, (int) ($season['season_id'] ?? 0)];
         $sql = "SELECT t.* FROM `{$teams}` t"
-            . " WHERE NOT EXISTS (SELECT 1 FROM `{$rosters}` r WHERE r.`league_id` = ? AND r.`team_id` = t.`id`)";
+            . " WHERE NOT EXISTS (SELECT 1 FROM `{$rosters}` r WHERE r.`league_id` = ? AND r.`team_id` = t.`id`)"
+            . " AND EXISTS (SELECT 1 FROM `{$events}` e"
+            . "   INNER JOIN `{$weeks}` w ON w.`id` = e.`week_id`"
+            . "   WHERE w.`season_id` = ? AND (e.`home_team_id` = t.`id` OR e.`away_team_id` = t.`id`))";
 
         $search = trim($search);
 
@@ -257,6 +277,32 @@ final class Rosters
             . ' LIMIT ' . max(1, min(200, $limit)),
             [$leagueId]
         );
+    }
+
+    /**
+     * Whether a team actually plays in this league's season.
+     *
+     * 🚨 Asked of the FIXTURES rather than of a league column on the team,
+     * which is both provider-neutral and stricter: a club with no games this
+     * season is not claimable however it is labelled, and a club that has moved
+     * competitions is where its fixtures are.
+     */
+    private function playsIn(int $seasonId, int $teamId): bool
+    {
+        if ($seasonId < 1 || $teamId < 1) {
+            return false;
+        }
+
+        $events = $this->db->prefixed('picks_events');
+        $weeks = $this->db->prefixed('picks_weeks');
+
+        return $this->db->selectOne(
+            "SELECT 1 FROM `{$events}` e
+               INNER JOIN `{$weeks}` w ON w.`id` = e.`week_id`
+              WHERE w.`season_id` = ? AND (e.`home_team_id` = ? OR e.`away_team_id` = ?)
+              LIMIT 1",
+            [$seasonId, $teamId, $teamId],
+        ) !== null;
     }
 
     private function log(int $leagueId, int $franchiseId, int $teamId, string $kind, int $weekId): void

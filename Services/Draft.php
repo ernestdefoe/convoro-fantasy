@@ -216,7 +216,7 @@ final class Draft
             return ['ok' => false, 'problem' => 'not_your_turn'];
         }
 
-        if (!$this->db->table('picks_teams')->where('id', $teamId)->exists()) {
+        if (!$this->playsIn((int) $league['season_id'], $teamId)) {
             return ['ok' => false, 'problem' => 'no_such_team'];
         }
 
@@ -314,10 +314,27 @@ final class Draft
     {
         $teams = $this->db->prefixed('picks_teams');
         $rosters = $this->db->prefixed('fantasy_rosters');
+        $events = $this->db->prefixed('picks_events');
+        $weeks = $this->db->prefixed('picks_weeks');
 
-        $bindings = [$leagueId];
+        /*
+         * 🚨 Only teams that PLAY in this league's season. `picks_teams` held
+         * one sport's teams when this was written; it now carries the NFL, the
+         * NBA, MLB, the NHL and league football too, and without this a college
+         * football draft board offers the Milwaukee Bucks.
+         *
+         * Asked of the fixtures rather than of a league column, which is both
+         * provider-neutral and stricter: a club with no games this season is
+         * not draftable however it is labelled.
+         */
+        $seasonId = $this->seasonOf($leagueId);
+
+        $bindings = [$leagueId, $seasonId];
         $sql = "SELECT t.* FROM `{$teams}` t"
-            . " WHERE NOT EXISTS (SELECT 1 FROM `{$rosters}` r WHERE r.`league_id` = ? AND r.`team_id` = t.`id`)";
+            . " WHERE NOT EXISTS (SELECT 1 FROM `{$rosters}` r WHERE r.`league_id` = ? AND r.`team_id` = t.`id`)"
+            . " AND EXISTS (SELECT 1 FROM `{$events}` e"
+            . "   INNER JOIN `{$weeks}` w ON w.`id` = e.`week_id`"
+            . "   WHERE w.`season_id` = ? AND (e.`home_team_id` = t.`id` OR e.`away_team_id` = t.`id`))";
 
         $search = trim($search);
 
@@ -335,6 +352,47 @@ final class Draft
     }
 
     /* ------------------------------------------------------------- private */
+
+    /**
+     * Whether a team actually plays in this league's season.
+     *
+     * 🚨 The guard that keeps a college-football draft from offering the
+     * Milwaukee Bucks. `picks_teams` held one sport's teams when this was
+     * written; Picks now carries the NFL, the NBA, MLB, the NHL and league
+     * football in the same table, so "a team exists" stopped being the same
+     * question as "a team is in this competition".
+     *
+     * 🚨 Asked of the FIXTURES rather than of a league column on the team,
+     * which is both provider-neutral and stricter: a club with no games this
+     * season is not draftable however it is labelled, and a club that has
+     * moved competitions is where its fixtures are.
+     */
+    private function playsIn(int $seasonId, int $teamId): bool
+    {
+        if ($seasonId < 1 || $teamId < 1) {
+            return false;
+        }
+
+        $events = $this->db->prefixed('picks_events');
+        $weeks = $this->db->prefixed('picks_weeks');
+
+        return $this->db->selectOne(
+            "SELECT 1 FROM `{$events}` e
+               INNER JOIN `{$weeks}` w ON w.`id` = e.`week_id`
+              WHERE w.`season_id` = ? AND (e.`home_team_id` = ? OR e.`away_team_id` = ?)
+              LIMIT 1",
+            [$seasonId, $teamId, $teamId],
+        ) !== null;
+    }
+
+    /** The Picks season a fantasy league plays. */
+    private function seasonOf(int $leagueId): int
+    {
+        $row = $this->db->table('fantasy_leagues')->where('id', $leagueId)->first();
+
+        return (int) ($row['season_id'] ?? 0);
+    }
+
 
     /**
      * The team the board takes when nobody chose.
@@ -355,20 +413,31 @@ final class Draft
         $teams = $this->db->prefixed('picks_teams');
         $rosters = $this->db->prefixed('fantasy_rosters');
         $events = $this->db->prefixed('picks_events');
+        $weeks = $this->db->prefixed('picks_weeks');
 
+        /*
+         * 🚨 Scoped to the season the same way `available()` is, and for the
+         * same reason. An autopick that can reach outside the competition is
+         * worse than one that cannot pick at all: it puts a team on somebody's
+         * roster that will never appear in a fixture, and the franchise is a
+         * starter short for the rest of the year with nothing on screen saying
+         * why.
+         */
         $sql = "SELECT t.`id`,"
             . " SUM(CASE"
             . "   WHEN e.`result` = 'home' AND e.`home_team_id` = t.`id` THEN 1"
             . "   WHEN e.`result` = 'away' AND e.`away_team_id` = t.`id` THEN 1"
             . "   ELSE 0 END) AS `wins`"
             . " FROM `{$teams}` t"
-            . " LEFT JOIN `{$events}` e ON (e.`home_team_id` = t.`id` OR e.`away_team_id` = t.`id`)"
-            . " WHERE NOT EXISTS (SELECT 1 FROM `{$rosters}` r WHERE r.`league_id` = ? AND r.`team_id` = t.`id`)"
+            . " INNER JOIN `{$events}` e ON (e.`home_team_id` = t.`id` OR e.`away_team_id` = t.`id`)"
+            . " INNER JOIN `{$weeks}` w ON w.`id` = e.`week_id`"
+            . " WHERE w.`season_id` = ?"
+            . " AND NOT EXISTS (SELECT 1 FROM `{$rosters}` r WHERE r.`league_id` = ? AND r.`team_id` = t.`id`)"
             . ' GROUP BY t.`id`, t.`name`'
             . ' ORDER BY `wins` DESC, t.`name` ASC'
             . ' LIMIT 1';
 
-        $row = $this->db->select($sql, [$leagueId])[0] ?? null;
+        $row = $this->db->select($sql, [$this->seasonOf($leagueId), $leagueId])[0] ?? null;
 
         return $row === null ? null : (int) $row['id'];
     }

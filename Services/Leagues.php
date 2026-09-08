@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Convoro\Extensions\Fantasy\Services;
 
+use Convoro\Extensions\Fantasy\Services\Sports\Scoring as SportScoring;
+
 use Convoro\Engine\Database\Connection;
 use Convoro\Engine\Support\Str;
 
@@ -131,10 +133,24 @@ final class Leagues
             'updated_at' => $this->now(),
         ];
 
-        foreach (self::SCORING as $column => $default) {
+        /*
+         * 🚨 The defaults come from the SPORT this season is played in, not
+         * from one set of numbers. Points scored, points allowed, margin, a
+         * win, a shutout and an upset all mean something in every sport, but a
+         * gridiron team scores about thirty points a game, a basketball team a
+         * hundred and ten, and a football team one and a half. A rate of 1.0
+         * per point is a sensible week in one, an absurd 110-point week in
+         * another and rounding error in the third.
+         *
+         * Anything the form actually sent still wins — this only decides what a
+         * commissioner starts from.
+         */
+        $defaults = SportScoring::defaultsFor($this->leagueKeyOf((int) $league['season_id'])) + self::SCORING;
+
+        foreach (self::SCORING as $column => $fallback) {
             $league[$column] = array_key_exists($column, $input)
                 ? $this->money($input[$column])
-                : $default;
+                : ($defaults[$column] ?? $fallback);
         }
 
         $id = $this->db->table('fantasy_leagues')->insertGetId($league);
@@ -356,6 +372,45 @@ final class Leagues
     }
 
     /* -------------------------------------------------------------- shaping */
+
+    /**
+     * Which competition a Picks season is, or '' when it does not say.
+     *
+     * 🚨 Read with a column probe rather than selected outright. Picks gained
+     * `picks_seasons.league` after this extension was written, and a Fantasy
+     * running against an older Picks is an ordinary situation — not one that
+     * should throw an unknown-column error at the moment somebody creates a
+     * league. Without it every league is gridiron, which is what they all were.
+     */
+    private function leagueKeyOf(int $seasonId): string
+    {
+        if ($seasonId < 1) {
+            return '';
+        }
+
+        $table = $this->db->prefixed('picks_seasons');
+
+        try {
+            $has = false;
+
+            foreach ($this->db->select("SHOW COLUMNS FROM `{$table}`") as $column) {
+                if (($column['Field'] ?? '') === 'league') {
+                    $has = true;
+                    break;
+                }
+            }
+
+            if (!$has) {
+                return '';
+            }
+
+            $row = $this->db->selectOne("SELECT `league` FROM `{$table}` WHERE `id` = ?", [$seasonId]);
+
+            return (string) ($row['league'] ?? '');
+        } catch (\Throwable) {
+            return '';
+        }
+    }
 
     /**
      * Scoring rule columns and what a league gets when nothing is chosen.

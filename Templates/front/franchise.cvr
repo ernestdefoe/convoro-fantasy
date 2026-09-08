@@ -142,7 +142,17 @@
                     <tr><td>@lang('fantasy.points_per_point')</td><td class="fan-num">{{ number_format($league['points_per_point'], 2) }}</td></tr>
                     <tr><td>@lang('fantasy.points_per_point_allowed')</td><td class="fan-num">{{ number_format($league['points_per_point_allowed'], 2) }}</td></tr>
                     <tr><td>@lang('fantasy.win_bonus')</td><td class="fan-num">{{ number_format($league['win_bonus'], 2) }}</td></tr>
+                    {#
+                        🚨 Shown only when it is worth something, exactly as the
+                        upset bonus already is. A basketball league starts with
+                        no shutout bonus because a basketball shutout cannot
+                        happen, and a rule listed at 0.00 that can never pay out
+                        reads as a broken rule rather than as an impossible
+                        event.
+                    #}
+                    @if($league['shutout_bonus'] != 0)
                     <tr><td>@lang('fantasy.shutout_bonus')</td><td class="fan-num">{{ number_format($league['shutout_bonus'], 2) }}</td></tr>
+                    @endif
                     <tr><td>@lang('fantasy.points_per_margin')</td><td class="fan-num">{{ number_format($league['points_per_margin'], 2) }}</td></tr>
                     @if($league['upset_bonus'] != 0)
                     <tr><td>@lang('fantasy.upset_bonus')</td><td class="fan-num">{{ number_format($league['upset_bonus'], 2) }}</td></tr>
