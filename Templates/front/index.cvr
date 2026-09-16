@@ -39,7 +39,7 @@
     @each ($leagues as $league)
     <div class="card fan-league-card">
         <div class="card-body">
-            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+            <div class="fan-facts">
                 <h3><a href="/fantasy/{{ $league['slug'] }}">{{ $league['name'] }}</a></h3>
                 <span class="fan-pill @if($league['status'] === 'drafting')fan-pill-live @endif@if($league['status'] === 'complete')fan-pill-done @endif">
                     @if($league['status'] === 'setup')@lang('fantasy.status_setup')@endif

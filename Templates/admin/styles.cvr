@@ -1,0 +1,26 @@
+{#
+    The Fantasy admin screen's own styles, injected once per page.
+
+    🚨 Separate from `front/styles`, deliberately. That sheet is ninety lines
+    of league, draft and lineup styling that an administrator's browser has no
+    use for, and pulling it in here to reach one rule would ship all of it on
+    a page that renders none of it.
+
+    🚨 Values come from Convoro's space scale. `--s-3` is 0.75rem, which is
+    what these forms were spaced by before — written into each tag as a
+    `style` attribute, where no stylesheet could find it and no theme could
+    ever change it.
+#}
+<style>
+/*
+ * Each league's card is a short stack of single-action forms — rescore,
+ * reschedule, adopt, delete — and each needs air above the one before it.
+ *
+ * Written as a sibling rule rather than a class on every form, because the
+ * thing being described is the GAP BETWEEN them, not a property of any one.
+ * The first form sits tight under the paragraph above it, every later one is
+ * separated, and a fifth form added next year is spaced without anybody
+ * remembering to say so.
+ */
+.admin-card-body > form + form { margin-top: var(--s-3); }
+</style>

@@ -3,6 +3,8 @@
 @section('title')@lang('fantasy.admin_title')@endsection
 
 @section('content')
+@include('fantasy::admin/styles')
+
 <div class="admin-header">
     <div>
         <h1>@lang('fantasy.admin_title')</h1>
@@ -119,12 +121,12 @@
                     <span class="form-hint">@lang('fantasy.admin_rescore_hint')</span>
                 </form>
 
-                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/reschedule" style="margin-top:.75rem;">
+                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/reschedule">
                     @csrf
                     <button type="submit" class="btn btn-secondary btn-sm">@lang('fantasy.admin_reschedule')</button>
                 </form>
 
-                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/adopt" style="margin-top:.75rem;">
+                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/adopt">
                     @csrf
                     <label for="fan-adopt-{{ $league['id'] }}">@lang('fantasy.admin_adopt')</label>
                     <input type="text" id="fan-adopt-{{ $league['id'] }}" name="commissioner"
@@ -139,7 +141,7 @@
                     one click from a list of leagues is a button that gets
                     pressed on the wrong row.
                 #}
-                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/delete" style="margin-top:.75rem;">
+                <form method="post" action="/admin/fantasy/{{ $league['id'] }}/delete">
                     @csrf
                     <label for="fan-del-{{ $league['id'] }}">@lang('fantasy.admin_delete')</label>
                     <input type="text" id="fan-del-{{ $league['id'] }}" name="confirm_name"

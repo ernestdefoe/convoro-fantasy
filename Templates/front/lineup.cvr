@@ -90,7 +90,7 @@
     <p class="fan-empty">@lang('fantasy.roster_full_hint')</p>
     @endif
 
-    <form method="get" action="/fantasy/{{ $league['slug'] }}/lineup" style="margin-bottom:.75rem;">
+    <form class="fan-filter" method="get" action="/fantasy/{{ $league['slug'] }}/lineup">
         <input type="search" name="q" class="form-input input-sm" value="{{ $search }}"
                placeholder="@lang('fantasy.search_teams')" aria-label="@lang('fantasy.search_teams')">
     </form>

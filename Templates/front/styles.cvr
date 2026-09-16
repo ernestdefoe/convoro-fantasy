@@ -10,28 +10,28 @@
     league page is exactly the sort of thing a community re-skins.
 #}
 <style>
-.fan-meta { color: var(--text-muted, #6b7280); font-size: .875rem; }
+.fan-meta { color: var(--c-text-muted); font-size: .875rem; }
 
 .fan-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
 
 .fan-league-card { display: flex; flex-direction: column; gap: .5rem; }
 .fan-league-card h3 { margin: 0; font-size: 1.05rem; }
-.fan-league-card .fan-desc { color: var(--text-muted, #6b7280); font-size: .875rem; margin: 0; }
+.fan-league-card .fan-desc { color: var(--c-text-muted); font-size: .875rem; margin: 0; }
 
 .fan-pill {
     display: inline-flex; align-items: center; gap: .35rem;
     font-size: .75rem; font-weight: 600; letter-spacing: .01em;
     padding: .15rem .5rem; border-radius: 999px;
-    background: var(--c-surface-sunken, #f3f4f6); color: var(--text-muted, #6b7280);
+    background: var(--c-bg); color: var(--c-text-muted);
 }
 .fan-pill-live { background: var(--c-primary, #2563eb); color: #fff; }
-.fan-pill-done { background: var(--c-surface-sunken, #f3f4f6); }
+.fan-pill-done { background: var(--c-bg); }
 
 .fan-table { width: 100%; border-collapse: collapse; }
 .fan-table th, .fan-table td { padding: .5rem .6rem; text-align: left; }
 .fan-table thead th {
     font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
-    color: var(--text-muted, #6b7280); border-bottom: 1px solid var(--c-border, #e5e7eb);
+    color: var(--c-text-muted); border-bottom: 1px solid var(--c-border, #e5e7eb);
 }
 .fan-table tbody tr + tr td { border-top: 1px solid var(--c-border, #e5e7eb); }
 .fan-table .fan-num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -41,7 +41,7 @@
     width: 1.6rem; height: 1.6rem; flex: 0 0 auto;
     border-radius: 50%; overflow: hidden;
     display: inline-flex; align-items: center; justify-content: center;
-    background: var(--c-surface-sunken, #f3f4f6);
+    background: var(--c-bg);
 }
 .fan-mark img { width: 74%; height: 74%; object-fit: contain; }
 
@@ -56,7 +56,7 @@
 .fan-matchup .fan-side { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
 .fan-matchup .fan-side-away { text-align: right; align-items: flex-end; }
 .fan-matchup .fan-score { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.fan-matchup .fan-vs { color: var(--text-muted, #6b7280); font-size: .8rem; }
+.fan-matchup .fan-vs { color: var(--c-text-muted); font-size: .8rem; }
 .fan-matchup-bye { grid-template-columns: 1fr auto; }
 
 .fan-lineup { display: flex; flex-direction: column; gap: .5rem; }
@@ -67,7 +67,7 @@
 .fan-row-starting { border-color: var(--c-primary, #2563eb); }
 .fan-row .fan-row-main { display: flex; align-items: center; gap: .6rem; flex: 1 1 12rem; min-width: 0; }
 .fan-row .fan-mark { width: 2rem; height: 2rem; }
-.fan-row .fan-row-note { color: var(--text-muted, #6b7280); font-size: .8rem; }
+.fan-row .fan-row-note { color: var(--c-text-muted); font-size: .8rem; }
 .fan-row form { margin: 0; }
 
 .fan-section { margin-top: 1.75rem; }
@@ -76,13 +76,13 @@
 .fan-board { overflow-x: auto; }
 .fan-board table { min-width: 100%; }
 .fan-slot { display: flex; flex-direction: column; gap: .1rem; }
-.fan-slot-empty { color: var(--text-muted, #6b7280); }
-.fan-slot-owner { font-size: .7rem; color: var(--text-muted, #6b7280); }
+.fan-slot-empty { color: var(--c-text-muted); }
+.fan-slot-owner { font-size: .7rem; color: var(--c-text-muted); }
 
 .fan-clock {
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
     padding: .9rem 1.1rem; border-radius: .6rem;
-    background: var(--c-surface-sunken, #f3f4f6); margin-bottom: 1rem;
+    background: var(--c-bg); margin-bottom: 1rem;
 }
 .fan-clock-mine { background: var(--c-primary, #2563eb); color: #fff; }
 .fan-clock-mine .fan-meta { color: rgba(255, 255, 255, .8); }
@@ -90,5 +90,33 @@
 .fan-moves { display: flex; flex-direction: column; gap: .4rem; font-size: .875rem; }
 .fan-move { display: flex; align-items: center; gap: .5rem; }
 
-.fan-empty { color: var(--text-muted, #6b7280); }
+.fan-empty { color: var(--c-text-muted); }
+
+/*
+ * 🚨 The four things that were written as inline style attributes.
+ *
+ * Every value here was already on Convoro's 4px space scale — .75rem is
+ * --s-3, 1rem is --s-4 — so nothing moves by a pixel. The defect the design
+ * audit was reporting is that they were in the markup, where no stylesheet can
+ * find them and no theme can ever change them.
+ *
+ * Named for what they are rather than what they do, because `.mt-3` is the
+ * habit that produces a second spacing system beside the first one.
+ */
+
+/* A single-action form stacked under the block it acts on — leave a league,
+   delete one, adopt an orphaned one. */
+.fan-action-form { margin-top: var(--s-3); }
+
+/* The filter above a table: pick a week, pick a round. */
+.fan-filter { margin-bottom: var(--s-3); }
+
+/* A row of small facts beside each other — a league's sport, its size, its
+   state — that must wrap rather than overflow on a phone. */
+.fan-facts {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    flex-wrap: wrap;
+}
 </style>
